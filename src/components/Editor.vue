@@ -93,8 +93,14 @@ export default Vue.extend({
       return "";
     },
     deleteKey(e: any) {
+      const sel = window.getSelection();
+      if (
+        sel?.getRangeAt(0).startOffset !== sel?.getRangeAt(0).endOffset &&
+        document.activeElement
+      )
+        document.activeElement.textContent = "";
+        
       if (this.getCharacterPreceedingCaret(e) === "") {
-        e.preventDefault();
         const active = document.activeElement;
         const content = active?.textContent;
         (
@@ -116,6 +122,7 @@ export default Vue.extend({
           sel?.removeAllRanges();
           sel?.addRange(range);
         }
+        e.preventDefault();
       }
     },
     enterKey(e: any) {
