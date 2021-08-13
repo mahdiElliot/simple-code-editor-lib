@@ -147,7 +147,7 @@ export default Vue.extend({
       el2.addEventListener("keydown", this.typed);
       el2.addEventListener("keyup", this.up);
       el.appendChild(el2);
-      (this.$refs.editor as any).appendChild(el);
+      (this.$refs.editor as any).insertBefore(el, e.target.parentNode.nextSibling);
       (e.target.parentNode?.nextSibling?.lastChild as any).focus();
       e.preventDefault();
     },
