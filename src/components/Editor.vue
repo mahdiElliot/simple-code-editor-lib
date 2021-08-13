@@ -34,7 +34,7 @@
       @scroll="changeScrollRight"
       spellcheck="false"
     ></div> -->
-    <div id="editor" ref="editor" dir="auto" @click="clickedEditor">
+    <!-- <div id="editor" ref="editor" dir="auto" @click="clickedEditor">
       <div v-for="i in lineNumber" :key="i" :id="i" @click="clickedLine">
         <span @click="lineNumberClicked"></span>
         <div
@@ -43,6 +43,12 @@
           @keyup="up"
           @keydown="typed"
         ></div>
+      </div>
+    </div> -->
+    <div id="editor" ref="editor" dir="auto" @click="clickedEditor">
+      <div id="1" @click="clickedLine">
+        <span @click="lineNumberClicked"></span>
+        <div contenteditable="true" @keyup="up" @keydown="typed"></div>
       </div>
     </div>
   </div>
@@ -73,76 +79,98 @@ export default Vue.extend({
         node.innerHTML = s.split("\n").join("<br/>");
       }
     },
-    caret() {
-      const temp = window.getSelection();
-      if (temp !== null) {
-        const range = temp.getRangeAt(0);
-        const prefix = range.cloneRange();
-        prefix.selectNodeContents(this.$refs.editor as any);
-        prefix.setEnd(range.endContainer, range.endOffset);
-        return prefix.toString().length;
+    getCharacterPreceedingCaret(e: any): string {
+      let sel = window.getSelection();
+      if (sel) {
+        if (sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0).cloneRange();
+          range.collapse(true);
+          range.setStart(e.target, 0);
+          const precedingChar = range.toString().slice(-1);
+          return precedingChar;
+        }
       }
-      return null;
+      return "";
     },
-    setCaret(pos: any) {
-      for (const node of (this.$refs.editor as any).childNodes) {
-        if (node.nodeType == Node.TEXT_NODE) {
-          if (node.length >= pos) {
-            const range = document.createRange();
-            const sel = window.getSelection();
-            range.setStart(node, pos);
+    deleteKey(e: any) {
+      if (this.getCharacterPreceedingCaret(e) === "") {
+        e.preventDefault();
+        const active = document.activeElement;
+        const content = active?.textContent;
+        (
+          document.activeElement?.parentElement?.previousSibling
+            ?.lastChild as any
+        ).focus();
+        active?.parentElement?.remove();
+        if (document.activeElement && document.activeElement.childNodes.length) {
+          const len = document.activeElement.textContent?.length;
+          document.activeElement.textContent =
+            (document.activeElement.textContent || "") + (content || "");
+          const range = document.createRange();
+          const sel = window.getSelection();
+          range.setStart(document.activeElement.childNodes[0], len || 1);
+          range.collapse(true);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
+      }
+    },
+    enterKey(e: any) {
+      let rest = "";
+      if (e.target.childNodes.length) {
+        let sel = window.getSelection();
+        if (sel) {
+          if (sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0).cloneRange();
+            const range2 = sel.getRangeAt(0).cloneRange();
             range.collapse(true);
-            sel?.removeAllRanges();
-            sel?.addRange(range);
-            return -1;
-          } else {
-            pos = pos - node.length;
-          }
-        } else {
-          pos = this.setCaret(pos);
-          if (pos < 0) {
-            return pos;
+            range.setEnd(
+              e.target.childNodes[0],
+              document.activeElement?.textContent?.length || 1
+            );
+            rest = range.toString();
+            range2.setStart(e.target.childNodes[0], 0);
+            e.target.textContent = range2.toString();
           }
         }
       }
-      return pos;
+      this.lineNumber++;
+      const el = document.createElement("div");
+      el.setAttribute("id", this.lineNumber + "");
+      el.addEventListener("click", this.clickedLine);
+      const span = document.createElement("span");
+      span.addEventListener("click", this.lineNumberClicked);
+      el.appendChild(span);
+      const el2 = document.createElement("div");
+      el2.setAttribute("contenteditable", "true");
+      el2.textContent = rest;
+      el2.addEventListener("keydown", this.typed);
+      el2.addEventListener("keyup", this.up);
+      el.appendChild(el2);
+      (this.$refs.editor as any).appendChild(el);
+      (e.target.parentNode?.nextSibling?.lastChild as any).focus();
+      e.preventDefault();
     },
-    async typed(e: any) {
+    typed(e: any) {
       if (
         (this.$refs.editor as any).firstChild.id !==
           document.activeElement?.parentElement?.id &&
         e.keyCode === 8
       ) {
-        if (document.activeElement?.textContent === "") {
-          e.preventDefault();
-          const active = document.activeElement;
-          (
-            document.activeElement.parentElement?.previousSibling
-              ?.lastChild as any
-          ).focus();
-          await active.parentElement?.remove();
-          // this.lineNumber = (this.$refs.editor as any).children.length;
-        }
-      }
-      if (e.keyCode === 13) {
-        await this.lineNumber++;
-        (
-          document.activeElement?.parentNode?.nextSibling?.lastChild as any
-        ).focus();
-        e.preventDefault();
+        this.deleteKey(e);
+      } else if (e.keyCode === 13) {
+        this.enterKey(e);
       }
     },
     up(e: any) {
-      if (e.keyCode === 13) {
-        e.preventDefault();
-      }
+      this.text = (this.$refs.editor as any).innerText;
     },
     clickedEditor(e: any) {
       if (e.target.id === "editor")
         (this.$refs.editor as any).lastChild.lastChild.focus();
     },
     clickedLine(e: any) {
-      if (e.target.lastChild !== null) e.target.lastChild.focus();
+      if (e.target.id !== "") e.target.lastChild.focus();
     },
     lineNumberClicked(e: any) {
       e.target.nextSibling.focus();
@@ -194,6 +222,8 @@ export default Vue.extend({
   color: white;
   counter-reset: line;
   position: relative;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 #editor div {
@@ -206,6 +236,7 @@ export default Vue.extend({
 
 #editor div div {
   padding-left: 0;
+  width: 100%;
 }
 
 #editor div span {
