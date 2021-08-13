@@ -99,7 +99,7 @@ export default Vue.extend({
         document.activeElement
       )
         document.activeElement.textContent = "";
-        
+
       if (this.getCharacterPreceedingCaret(e) === "") {
         const active = document.activeElement;
         const content = active?.textContent;
@@ -108,19 +108,20 @@ export default Vue.extend({
             ?.lastChild as any
         ).focus();
         active?.parentElement?.remove();
-        if (
-          document.activeElement &&
-          document.activeElement.childNodes.length
-        ) {
-          const len = document.activeElement.textContent?.length;
-          document.activeElement.textContent =
-            (document.activeElement.textContent || "") + (content || "");
-          const range = document.createRange();
-          const sel = window.getSelection();
-          range.setStart(document.activeElement.childNodes[0], len || 1);
-          range.collapse(true);
-          sel?.removeAllRanges();
-          sel?.addRange(range);
+        if (document.activeElement) {
+          if (document.activeElement.childNodes.length) {
+            const len = document.activeElement.textContent?.length;
+            document.activeElement.textContent =
+              (document.activeElement.textContent || "") + (content || "");
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.setStart(document.activeElement.childNodes[0], len || 0);
+            range.collapse(true);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+          }
+          else
+            document.activeElement.textContent = content || "";
         }
         e.preventDefault();
       }
@@ -169,10 +170,10 @@ export default Vue.extend({
         return;
 
       const sel = window.getSelection();
-      const start = sel?.getRangeAt(0).startOffset || 1;
+      const start = sel?.getRangeAt(0).startOffset || 0;
       e.target.parentNode?.previousSibling?.lastChild.focus();
       if (document.activeElement && document.activeElement.childNodes.length) {
-        const len = document.activeElement.textContent?.length || 1;
+        const len = document.activeElement.textContent?.length || 0;
         const range = document.createRange();
         const sel = window.getSelection();
         const pos = start > len ? len : start;
@@ -189,10 +190,10 @@ export default Vue.extend({
         return;
 
       const sel = window.getSelection();
-      const start = sel?.getRangeAt(0).startOffset || 1;
+      const start = sel?.getRangeAt(0).startOffset || 0;
       e.target.parentNode?.nextSibling?.lastChild.focus();
       if (document.activeElement && document.activeElement.childNodes.length) {
-        const len = document.activeElement.textContent?.length || 1;
+        const len = document.activeElement.textContent?.length || 0;
         const range = document.createRange();
         const sel = window.getSelection();
         const pos = start > len ? len : start;
