@@ -102,7 +102,10 @@ export default Vue.extend({
             ?.lastChild as any
         ).focus();
         active?.parentElement?.remove();
-        if (document.activeElement && document.activeElement.childNodes.length) {
+        if (
+          document.activeElement &&
+          document.activeElement.childNodes.length
+        ) {
           const len = document.activeElement.textContent?.length;
           document.activeElement.textContent =
             (document.activeElement.textContent || "") + (content || "");
@@ -147,8 +150,50 @@ export default Vue.extend({
       el2.addEventListener("keydown", this.typed);
       el2.addEventListener("keyup", this.up);
       el.appendChild(el2);
-      (this.$refs.editor as any).insertBefore(el, e.target.parentNode.nextSibling);
+      (this.$refs.editor as any).insertBefore(
+        el,
+        e.target.parentNode.nextSibling
+      );
       (e.target.parentNode?.nextSibling?.lastChild as any).focus();
+      e.preventDefault();
+    },
+    upKey(e: any) {
+      if (e.target.parentNode?.id === (this.$refs.editor as any).firstChild?.id)
+        return;
+
+      const sel = window.getSelection();
+      const start = sel?.getRangeAt(0).startOffset || 1;
+      e.target.parentNode?.previousSibling?.lastChild.focus();
+      if (document.activeElement && document.activeElement.childNodes.length) {
+        const len = document.activeElement.textContent?.length || 1;
+        const range = document.createRange();
+        const sel = window.getSelection();
+        const pos = start > len ? len : start;
+        range.setStart(document.activeElement.childNodes[0], pos);
+        range.collapse(true);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
+
+      e.preventDefault();
+    },
+    donwKey(e: any) {
+      if (e.target.parentNode?.id === (this.$refs.editor as any).lastChild?.id)
+        return;
+
+      const sel = window.getSelection();
+      const start = sel?.getRangeAt(0).startOffset || 1;
+      e.target.parentNode?.nextSibling?.lastChild.focus();
+      if (document.activeElement && document.activeElement.childNodes.length) {
+        const len = document.activeElement.textContent?.length || 1;
+        const range = document.createRange();
+        const sel = window.getSelection();
+        const pos = start > len ? len : start;
+        range.setStart(document.activeElement.childNodes[0], pos);
+        range.collapse(true);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
       e.preventDefault();
     },
     typed(e: any) {
@@ -156,11 +201,11 @@ export default Vue.extend({
         (this.$refs.editor as any).firstChild.id !==
           document.activeElement?.parentElement?.id &&
         e.keyCode === 8
-      ) {
+      )
         this.deleteKey(e);
-      } else if (e.keyCode === 13) {
-        this.enterKey(e);
-      }
+      else if (e.keyCode === 13) this.enterKey(e);
+      else if (e.keyCode === 38) this.upKey(e);
+      else if (e.keyCode === 40) this.donwKey(e);
     },
     up(e: any) {
       this.text = (this.$refs.editor as any).innerText;
@@ -220,10 +265,10 @@ export default Vue.extend({
   line-height: 1.5;
   font-size: 2em;
   color: white;
-  counter-reset: line;
   position: relative;
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
+  counter-reset: line;
 }
 
 #editor div {
@@ -249,13 +294,6 @@ export default Vue.extend({
   counter-increment: line;
   color: white;
 }
-
-// #editor div::before {
-//   content: counter(line);
-//   counter-increment: line;
-//   color: white;
-//   margin-right: 16px;
-// }
 
 #lines {
   width: 48px;
