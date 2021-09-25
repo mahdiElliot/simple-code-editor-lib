@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <editor/>
+    <editor />
   </div>
 </template>
 
@@ -11,7 +11,7 @@ import Editor from "./components/Editor.vue";
 export default Vue.extend({
   name: "App",
   components: {
-    Editor
+    Editor,
   },
 });
 </script>
@@ -25,9 +25,6 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #2c3e50;
-  margin-top: 60px;
-  margin-left: 12px;
-  margin-right: 12px;
-  background: whitesmoke;
+  
 }
 </style>

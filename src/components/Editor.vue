@@ -1,337 +1,338 @@
 <template>
-  <!-- <div class="editor">
-    <textarea
-      v-model="lines"
-      id="lines"
-      name="lines"
-      rows="30"
-      disabled
-      @scroll="changeScrollLeft"
-      ref="line"
-    />
-    <textarea
-      id="editor"
-      name="editor"
-      rows="30"
-      dir="auto"
-      v-model="text"
-      @input="typed"
-      @scroll="changeScrollRight"
-      ref="editor"
-    />
-  </div> -->
-  <div class="editor">
-    <!-- <div id="lines" @scroll="changeScrollLeft" ref="line">
-      <span v-for="i in lineNumber" :key="i">{{ i }}</span>
-    </div> -->
-    <!-- <div
-      id="editor"
-      contenteditable="true"
-      @keydown="typed"
-      @keyup="up"
-      ref="editor"
-      dir="auto"
-      @scroll="changeScrollRight"
-      spellcheck="false"
-    ></div> -->
-    <!-- <div id="editor" ref="editor" dir="auto" @click="clickedEditor">
-      <div v-for="i in lineNumber" :key="i" :id="i" @click="clickedLine">
-        <span @click="lineNumberClicked"></span>
-        <div
-          style="width: 100%"
-          contenteditable="true"
-          @keyup="up"
-          @keydown="typed"
-        ></div>
-      </div>
-    </div> -->
-    <div id="editor" ref="editor" dir="auto" @click="clickedEditor">
-      <div id="1" @click="clickedLine">
-        <span @click="lineNumberClicked"></span>
-        <div contenteditable="true" @keyup="up" @keydown="typed"></div>
-      </div>
+  <div class="main">
+    <div class="lines" @scroll="changeScrollLeft" ref="line">
+      <div v-for="i in lineNumber" :key="i">{{ i }}</div>
+    </div>
+    <div style="height: 200px; position: relative; width: 100%">
+      <textarea
+        id="editing"
+        spellcheck="false"
+        @input="inputChanged"
+        @scroll="sync_scroll"
+        @keydown="check_tab"
+        @keyup="up"
+        v-model="text"
+        ref="editor"
+      ></textarea>
+      <pre id="highlighting" aria-hidden="true">
+        <code class="language-js" id="highlighting-content">
+        </code>
+      </pre>
     </div>
   </div>
 </template>
 
-<script lang="ts">
-import Vue from "vue";
-export default Vue.extend({
+<script>
+import Prism from "prismjs";
+export default {
   data() {
     return {
       lineNumber: 1,
       text: "",
       isSyncingLeftScroll: false,
       isSyncingRightScroll: false,
+      clicked: false,
     };
   },
   methods: {
-    t(el: any) {
-      for (const node of el.children) {
-        const s = node.innerText
-          .replace(/(\/\/.*)/g, "<em>$1</em>")
-          .replace(
-            /\b(new|if|else|do|while|switch|for|in|of|continue|break|return|typeof|function|var|const|let|\.length|\.\w+)(?=[^\w])/g,
-            "<strong>$1</strong>"
-          )
-          .replace(/(".*?"|'.*?'|`.*?`)/g, "<strong><em>$1</em></strong>")
-          .replace(/\b(\d+)/g, "<em><strong>$1</strong></em>");
-        node.innerHTML = s.split("\n").join("<br/>");
-      }
-    },
-    getCharacterPreceedingCaret(e: any): string {
-      let sel = window.getSelection();
-      if (sel) {
-        if (sel.rangeCount > 0) {
-          const range = sel.getRangeAt(0).cloneRange();
-          range.collapse(true);
-          range.setStart(e.target, 0);
-          const precedingChar = range.toString().slice(-1);
-          return precedingChar;
-        }
-      }
-      return "";
-    },
-    deleteKey(e: any) {
-      const sel = window.getSelection();
-      if (
-        sel?.getRangeAt(0).startOffset !== sel?.getRangeAt(0).endOffset &&
-        document.activeElement
-      )
-        document.activeElement.textContent = "";
-
-      if (this.getCharacterPreceedingCaret(e) === "") {
-        const active = document.activeElement;
-        const content = active?.textContent;
-        (
-          document.activeElement?.parentElement?.previousSibling
-            ?.lastChild as any
-        ).focus();
-        active?.parentElement?.remove();
-        if (document.activeElement) {
-          if (document.activeElement.childNodes.length) {
-            const len = document.activeElement.textContent?.length;
-            document.activeElement.textContent =
-              (document.activeElement.textContent || "") + (content || "");
-            const range = document.createRange();
-            const sel = window.getSelection();
-            range.setStart(document.activeElement.childNodes[0], len || 0);
-            range.collapse(true);
-            sel?.removeAllRanges();
-            sel?.addRange(range);
-          }
-          else
-            document.activeElement.textContent = content || "";
-        }
-        e.preventDefault();
-      }
-    },
-    enterKey(e: any) {
-      let rest = "";
-      if (e.target.childNodes.length) {
-        let sel = window.getSelection();
-        if (sel) {
-          if (sel.rangeCount > 0) {
-            const range = sel.getRangeAt(0).cloneRange();
-            const range2 = sel.getRangeAt(0).cloneRange();
-            range.collapse(true);
-            range.setEnd(
-              e.target.childNodes[0],
-              document.activeElement?.textContent?.length || 1
-            );
-            rest = range.toString();
-            range2.setStart(e.target.childNodes[0], 0);
-            e.target.textContent = range2.toString();
-          }
-        }
-      }
-      this.lineNumber++;
-      const el = document.createElement("div");
-      el.setAttribute("id", this.lineNumber + "");
-      el.addEventListener("click", this.clickedLine);
-      const span = document.createElement("span");
-      span.addEventListener("click", this.lineNumberClicked);
-      el.appendChild(span);
-      const el2 = document.createElement("div");
-      el2.setAttribute("contenteditable", "true");
-      el2.textContent = rest;
-      el2.addEventListener("keydown", this.typed);
-      el2.addEventListener("keyup", this.up);
-      el.appendChild(el2);
-      (this.$refs.editor as any).insertBefore(
-        el,
-        e.target.parentNode.nextSibling
-      );
-      (e.target.parentNode?.nextSibling?.lastChild as any).focus();
-      e.preventDefault();
-    },
-    upKey(e: any) {
-      if (e.target.parentNode?.id === (this.$refs.editor as any).firstChild?.id)
-        return;
-
-      const sel = window.getSelection();
-      const start = sel?.getRangeAt(0).startOffset || 0;
-      e.target.parentNode?.previousSibling?.lastChild.focus();
-      if (document.activeElement && document.activeElement.childNodes.length) {
-        const len = document.activeElement.textContent?.length || 0;
-        const range = document.createRange();
-        const sel = window.getSelection();
-        const pos = start > len ? len : start;
-        range.setStart(document.activeElement.childNodes[0], pos);
-        range.collapse(true);
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      }
-
-      e.preventDefault();
-    },
-    donwKey(e: any) {
-      if (e.target.parentNode?.id === (this.$refs.editor as any).lastChild?.id)
-        return;
-
-      const sel = window.getSelection();
-      const start = sel?.getRangeAt(0).startOffset || 0;
-      e.target.parentNode?.nextSibling?.lastChild.focus();
-      if (document.activeElement && document.activeElement.childNodes.length) {
-        const len = document.activeElement.textContent?.length || 0;
-        const range = document.createRange();
-        const sel = window.getSelection();
-        const pos = start > len ? len : start;
-        range.setStart(document.activeElement.childNodes[0], pos);
-        range.collapse(true);
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      }
-      e.preventDefault();
-    },
-    typed(e: any) {
-      if (
-        (this.$refs.editor as any).firstChild.id !==
-          document.activeElement?.parentElement?.id &&
-        e.keyCode === 8
-      )
-        this.deleteKey(e);
-      else if (e.keyCode === 13) this.enterKey(e);
-      else if (e.keyCode === 38) this.upKey(e);
-      else if (e.keyCode === 40) this.donwKey(e);
-    },
-    up(e: any) {
-      this.text = (this.$refs.editor as any).innerText;
-    },
-    clickedEditor(e: any) {
-      if (e.target.id === "editor")
-        (this.$refs.editor as any).lastChild.lastChild.focus();
-    },
-    clickedLine(e: any) {
-      if (e.target.id !== "") e.target.lastChild.focus();
-    },
-    lineNumberClicked(e: any) {
-      e.target.nextSibling.focus();
-    },
-    changeScrollRight() {
-      if (!this.isSyncingRightScroll) {
-        this.isSyncingLeftScroll = true;
-        (this.$refs.line as any).scrollTop = (
-          this.$refs.editor as any
-        ).scrollTop;
-      }
-      this.isSyncingRightScroll = false;
-    },
     changeScrollLeft() {
       if (!this.isSyncingLeftScroll) {
         this.isSyncingRightScroll = true;
-        (this.$refs.editor as any).scrollTop = (
-          this.$refs.line as any
-        ).scrollTop;
+        this.$refs.editor.scrollTop = this.$refs.line.scrollTop;
       }
       this.isSyncingLeftScroll = false;
     },
+    sync_scroll(e) {
+      let result_element = document.querySelector("#highlighting");
+      // Get and set x and y
+      result_element.scrollTop = e.target.scrollTop;
+      result_element.scrollLeft = e.target.scrollLeft;
+      if (!this.isSyncingRightScroll) {
+        this.isSyncingLeftScroll = true;
+        this.$refs.line.scrollTop = this.$refs.editor.scrollTop;
+      }
+      this.isSyncingRightScroll = false;
+    },
+    update(text) {
+      let result_element = document.querySelector("#highlighting-content");
+      // Handle final newlines
+      if (text[text.length - 1] == "\n") {
+        text += " ";
+      }
+      // Update code
+      result_element.innerHTML = text
+        .replace(new RegExp("&", "g"), "&amp;")
+        .replace(new RegExp("<", "g"), "&lt;"); /* Global RegExp */
+      // Syntax Highlight
+      Prism.highlightElement(result_element);
+    },
+    inputChanged(e) {
+      this.update(e.target.value);
+      this.sync_scroll(e);
+    },
+    up(e) {
+      if (e.ctrlKey && (e.key === "z" || e.key === "y")) {
+        this.lineNumber = this.text.split("\n").length;
+      }
+    },
+    check_tab(e) {
+      if (e.ctrlKey && e.key === "z") {
+      } else if (e.key === "Enter") {
+        this.lineNumber++;
+      } else if (e.key === "Backspace") {
+        if (e.target.value[e.target.selectionStart - 1] === "\n")
+          this.lineNumber--;
+      }
+      let code = e.target.value;
+      if (e.key == "Tab") {
+        /* Tab key pressed */
+        e.preventDefault(); // stop normal
+        let before_tab = code.slice(0, e.target.selectionStart); // text before tab
+        let after_tab = code.slice(
+          e.target.selectionEnd,
+          e.target.value.length
+        ); // text after tab
+        let cursor_pos = e.target.selectionEnd + 1; // where cursor moves after tab - moving forward by 1 char to after tab
+        e.target.value = before_tab + "\t" + after_tab; // add tab char
+        // move cursor
+        e.target.selectionStart = cursor_pos;
+        e.target.selectionEnd = cursor_pos;
+        this.update(e.target.value); // Update text to include indent
+      }
+    },
   },
   mounted() {
-    (this.$refs.editor as any).firstChild?.nextSibling?.focus();
+    window.Prism = window.Prism || {};
+    window.Prism.manual = true;
+    this.update("");
   },
-});
+};
 </script>
 
 <style lang="scss">
-.editor {
-  width: 100%;
-  height: 640px;
+.main {
   display: flex;
-  border-style: outset;
-  border-width: 8px;
-  border-color: rgb(143, 143, 143);
-  background: black;
-}
-#editor {
-  cursor: text;
-  width: 100%;
-  height: 95%;
-  outline: none;
-  overflow-y: auto;
-  resize: none;
-  line-height: 1.5;
-  font-size: 2em;
-  color: white;
   position: relative;
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-  counter-reset: line;
 }
-
-#editor div {
-  outline: none;
-  // border: 2px solid white;
-  display: flex;
-  padding-left: 1rem;
-  padding-right: 1rem;
-}
-
-#editor div div {
-  padding-left: 0;
-  width: 100%;
-}
-
-#editor div span {
-  width: 48px;
-  // border-right: 1px solid white;
-}
-
-#editor div span::before {
-  content: counter(line);
-  counter-increment: line;
-  color: white;
-}
-
-#lines {
-  width: 48px;
-  height: 95%;
-  font-size: 2em;
-  overflow-y: scroll;
-  -ms-overflow-style: none; /* Internet Explorer 10+ */
-  scrollbar-width: none; /* Firefox */
-  background: rgb(141, 141, 141);
-  color: white;
-  line-height: 1.5;
-  padding: 1rem;
-  outline: none;
-  border-right: 6px inset rgb(105, 105, 105);
-
-  text-align: center;
+.lines {
+  min-width: 24px;
+  z-index: 2;
+  height: 150px;
+  overflow: hidden;
+  border: 0;
+  margin-top: 10px;
+  padding-top: 6px;
+  padding-left: 4px;
+  padding-right: 4px;
+  padding-bottom: 10px;
+  font-size: 8pt;
+  font-family: monospace;
+  line-height: 16pt;
   resize: none;
-  opacity: 0.7;
-  display: flex;
-  flex-direction: column;
-}
-
-#lines span {
-  content: counter(line);
-  counter-increment: line;
+  outline: none;
   color: white;
-  margin-right: 16px;
+  background-color: grey;
+}
+#editing,
+#highlighting {
+  /* Both elements need the same text and space styling so they are directly on top of each other */
+  margin: 10px;
+  margin-left: 0;
+  padding: 10px;
+  padding-top: 6px;
+  border: 0;
+  width: calc(100% - 32px);
+  height: 150px;
+  outline: none;
+}
+#editing,
+#highlighting,
+#highlighting * {
+  /* Also add text styles to highlighing tokens */
+  font-size: 8pt;
+  font-family: monospace;
+  line-height: 16pt;
+  tab-size: 2;
 }
 
-#lines::-webkit-scrollbar {
-  display: none; /* Safari and Chrome */
+#editing,
+#highlighting {
+  /* In the same place */
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* Move the textarea in front of the result */
+
+#editing {
+  z-index: 1;
+}
+#highlighting {
+  z-index: 0;
+}
+
+/* Make textarea almost completely transparent */
+
+#editing {
+  color: transparent;
+  background: transparent;
+  caret-color: white; /* Or choose your favourite color */
+}
+
+/* Can be scrolled */
+#editing,
+#highlighting {
+  overflow: auto;
+  white-space: nowrap; /* Allows textarea to scroll horizontally */
+}
+
+/* No resize on textarea */
+#editing {
+  resize: none;
+}
+
+/* Paragraphs; First Image */
+* {
+  font-family: "Fira Code", monospace;
+}
+p code {
+  background-color: #eee;
+  color: #111;
+}
+
+/* Syntax Highlighting from prism.js starts below, partly modified: */
+
+/* PrismJS 1.23.0
+https://prismjs.com/download.html#themes=prism-funky&languages=markup */
+/**
+ * prism.js Funky theme
+ * Based on “Polyfilling the gaps” talk slides http://lea.verou.me/polyfilling-the-gaps/
+ * @author Lea Verou
+ */
+
+code[class*="language-"],
+pre[class*="language-"] {
+  font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+  font-size: 1em;
+  text-align: left;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  word-wrap: normal;
+  line-height: 1.5;
+
+  -moz-tab-size: 4;
+  -o-tab-size: 4;
+  tab-size: 4;
+
+  -webkit-hyphens: none;
+  -moz-hyphens: none;
+  -ms-hyphens: none;
+  hyphens: none;
+}
+
+/* Code blocks */
+pre[class*="language-"] {
+  padding: 0.4em 0.8em;
+  margin: 0.5em 0;
+  overflow: auto;
+  /* background: url('data:image/svg+xml;charset=utf-8,<svg%20version%3D"1.1"%20xmlns%3D"http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg"%20width%3D"100"%20height%3D"100"%20fill%3D"rgba(0%2C0%2C0%2C.2)">%0D%0A<polygon%20points%3D"0%2C50%2050%2C0%200%2C0"%20%2F>%0D%0A<polygon%20points%3D"0%2C100%2050%2C100%20100%2C50%20100%2C0"%20%2F>%0D%0A<%2Fsvg>');
+  background-size: 1em 1em; - WebCoder49*/
+  background: black; /* - WebCoder49 */
+}
+
+code[class*="language-"] {
+  background: black;
+  color: white;
+  box-shadow: -0.3em 0 0 0.3em black, 0.3em 0 0 0.3em black;
+}
+
+/* Inline code */
+:not(pre) > code[class*="language-"] {
+  padding: 0.2em;
+  box-shadow: none;
+  white-space: normal;
+}
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #aaa;
+}
+
+.token.punctuation {
+  color: #999;
+}
+
+.token.namespace {
+  opacity: 0.7;
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol {
+  color: #0cf;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin {
+  color: yellow;
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.token.variable,
+.token.inserted {
+  color: yellowgreen;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: deeppink;
+}
+
+.token.regex,
+.token.important {
+  color: orange;
+}
+
+.token.important,
+.token.bold {
+  font-weight: bold;
+}
+.token.italic {
+  font-style: italic;
+}
+
+.token.entity {
+  cursor: help;
+}
+
+.token.deleted {
+  color: red;
+}
+
+/* Plugin styles: Diff Highlight */
+pre.diff-highlight.diff-highlight > code .token.deleted:not(.prefix),
+pre > code.diff-highlight.diff-highlight .token.deleted:not(.prefix) {
+  background-color: rgba(255, 0, 0, 0.3);
+  display: inline;
+}
+
+pre.diff-highlight.diff-highlight > code .token.inserted:not(.prefix),
+pre > code.diff-highlight.diff-highlight .token.inserted:not(.prefix) {
+  background-color: rgba(0, 255, 128, 0.3);
+  display: inline;
 }
 </style>
